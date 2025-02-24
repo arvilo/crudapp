@@ -81,25 +81,25 @@ public class Service {
                 return "Empty table.";
             } else if (Data.TABLES.get(tableName).size() == 1) {
                 StringBuilder tableText = new StringBuilder();
-                appendHeavyLine(tableText, tableName);
-                appendRowToText(tableText, tableName, 0);
-                appendHeavyLine(tableText, tableName);
+                appendHeavyLine(tableText, tableName, false);
+                appendRowToText(tableText, tableName, 0, false);
+                appendHeavyLine(tableText, tableName, false);
                 tableText.deleteCharAt(tableText.length() - 1);
 
                 return tableText.toString();
             } else {
                 StringBuilder tableText = new StringBuilder();
-                appendHeavyLine(tableText, tableName);
-                appendRowToText(tableText, tableName, 0);
-                appendHeavyLine(tableText, tableName);
-                appendRowToText(tableText, tableName, 1);
+                appendHeavyLine(tableText, tableName, false);
+                appendRowToText(tableText, tableName, 0, false);
+                appendHeavyLine(tableText, tableName, false);
+                appendRowToText(tableText, tableName, 1, false);
                 IntStream
                         .range(2, Data.TABLES.get(tableName).size())
                         .forEach(i -> {
-                            appendLine(tableText, tableName);
-                            appendRowToText(tableText, tableName, i);
+                            appendLine(tableText, tableName, false);
+                            appendRowToText(tableText, tableName, i, false);
                         });
-                appendHeavyLine(tableText, tableName);
+                appendHeavyLine(tableText, tableName, false);
                 tableText.deleteCharAt(tableText.length() - 1);
 
                 return tableText.toString();
@@ -139,11 +139,16 @@ public class Service {
 
     private void appendRowToText(@NonNull StringBuilder text,
                                  @NonNull String tableName,
-                                 int number) {
+                                 int number,
+                                 boolean verticalRuler) {
         List<String> row = Data.TABLES.get(tableName).get(number);
         List<Integer> lengths = getColumnLengths(tableName);
         boolean header = number == 0;
-        text.append("|");
+        int lengthOfLastNumber = String.valueOf(Data.TABLES.get(tableName)).length() - 1;
+        int lengthOfCurrentNumber = String.valueOf(number).length();
+        text.append(verticalRuler && !header ?
+                " ".repeat(lengthOfLastNumber - lengthOfCurrentNumber) + number + " -> "
+                : "|");
         IntStream
                 .range(0, lengths.size())
                 .forEach(i -> {
@@ -156,13 +161,17 @@ public class Service {
     }
 
     private void appendLine(@NonNull StringBuilder text,
-                            @NonNull String tableName) {
+                            @NonNull String tableName,
+                            boolean verticalRuler) {
         List<Integer> lengths = getColumnLengths(tableName);
+        int lengthOfLastNumber = String.valueOf(Data.TABLES.get(tableName)).length() - 1;
+        if (verticalRuler) {
+            text.append(" ".repeat(lengthOfLastNumber + 4));
+        }
         text.append("|");
         lengths
                 .forEach(length -> {
-                            IntStream.range(0, length)
-                                    .forEach(i -> text.append("-"));
+                            text.append("-".repeat(length));
                             text.append("+");
                         }
                 );
@@ -171,11 +180,14 @@ public class Service {
     }
 
     private void appendHeavyLine(@NonNull StringBuilder text,
-                                 @NonNull String tableName) {
+                                 @NonNull String tableName,
+                                 boolean verticalRuler) {
+        int lengthOfLastNumber = String.valueOf(Data.TABLES.get(tableName)).length() - 1;
+        if (verticalRuler) {
+            text.append(" ".repeat(lengthOfLastNumber + 4));
+        }
         int length = getTableCharLength(tableName);
-        IntStream
-                .range(0, length)
-                .forEach(i -> text.append("="));
+        text.append("=".repeat(length));
         text.append("\n");
     }
 
@@ -198,12 +210,10 @@ public class Service {
             beforeSpaces = (allSpaces - 1) / 2;
             afterSpaces = (allSpaces + 1) / 2;
         }
-        StringBuilder text = new StringBuilder();
-        IntStream.range(0, beforeSpaces).forEach(i -> text.append(" "));
-        text.append(value);
-        IntStream.range(0, afterSpaces).forEach(i -> text.append(" "));
 
-        return text.toString();
+        return " ".repeat(beforeSpaces) +
+                value +
+                " ".repeat(afterSpaces);
     }
 
     private String getCellText(@NonNull String value, int length) {
