@@ -6,6 +6,7 @@ import az.arvilo.crudapp.exception.InvalidInputException;
 import lombok.NonNull;
 
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -60,16 +61,22 @@ public class Service {
     /**
      * This method retrieves the table data and formats it into a human-readable
      * string representation.
+     * - The table is displayed with a structured format, where columns and rows
+     * are separated by appropriate borders.
+     * - If `verticalRuler` is `true`, row numbers are displayed at the beginning
+     * of each row.
+     * - If the table is empty, it returns "Empty table."
      *
-     * @param tableName The name of the table to be rendered.
+     * @param tableName     The name of the table to be rendered.
+     * @param verticalRuler Whether to display row indices and an additional separator.
      * @return A formatted string representation of the table.
      * @throws InvalidInputException    if the table does not exist.
      * @throws DataBaseCorruptException if the table is corrupted.
      */
-    public String renderTable(@NonNull String tableName)
+    public String renderTable(@NonNull String tableName, boolean verticalRuler)
             throws InvalidInputException, DataBaseCorruptException {
         if (!isTableExist(tableName)) {
-            String errorMessage = String.format("%s is not exist", tableName);
+            String errorMessage = String.format("%s is not exist.", tableName);
             throw new InvalidInputException(errorMessage);
         }
         if (!isTableValid(tableName)) {
@@ -81,25 +88,25 @@ public class Service {
                 return "Empty table.";
             } else if (Data.TABLES.get(tableName).size() == 1) {
                 StringBuilder tableText = new StringBuilder();
-                appendHeavyLine(tableText, tableName, false);
-                appendRowToText(tableText, tableName, 0, false);
-                appendHeavyLine(tableText, tableName, false);
+                appendHeavyLine(tableText, tableName, verticalRuler);
+                appendRowToText(tableText, tableName, 0, verticalRuler);
+                appendHeavyLine(tableText, tableName, verticalRuler);
                 tableText.deleteCharAt(tableText.length() - 1);
 
                 return tableText.toString();
             } else {
                 StringBuilder tableText = new StringBuilder();
-                appendHeavyLine(tableText, tableName, false);
-                appendRowToText(tableText, tableName, 0, false);
-                appendHeavyLine(tableText, tableName, false);
-                appendRowToText(tableText, tableName, 1, false);
+                appendHeavyLine(tableText, tableName, verticalRuler);
+                appendRowToText(tableText, tableName, 0, verticalRuler);
+                appendHeavyLine(tableText, tableName, verticalRuler);
+                appendRowToText(tableText, tableName, 1, verticalRuler);
                 IntStream
                         .range(2, Data.TABLES.get(tableName).size())
                         .forEach(i -> {
-                            appendLine(tableText, tableName, false);
-                            appendRowToText(tableText, tableName, i, false);
+                            appendLine(tableText, tableName, verticalRuler);
+                            appendRowToText(tableText, tableName, i, verticalRuler);
                         });
-                appendHeavyLine(tableText, tableName, false);
+                appendHeavyLine(tableText, tableName, verticalRuler);
                 tableText.deleteCharAt(tableText.length() - 1);
 
                 return tableText.toString();
@@ -117,7 +124,7 @@ public class Service {
     public void addNewRow(@NonNull String tableName)
             throws InvalidInputException, DataBaseCorruptException {
         if (!isTableExist(tableName)) {
-            String errorMessage = String.format("%s is not exist", tableName);
+            String errorMessage = String.format("%s is not exist.", tableName);
             throw new InvalidInputException(errorMessage);
         }
         if (!isTableValid(tableName)) {
@@ -137,6 +144,193 @@ public class Service {
         }
     }
 
+    /**
+     * Renders a specific row from the specified table in a human-readable format.
+     * - The first row (index 0) is always the header.
+     *
+     * @param tableName The name of the table from which the row will be rendered.
+     * @param rowNumber The row index (starting from 1) to be displayed.
+     * @return A formatted string representation of the requested row.
+     * @throws InvalidInputException    if the table does not exist or the row number is invalid.
+     * @throws DataBaseCorruptException if the table is corrupted.
+     */
+    public String renderRow(@NonNull String tableName, @NonNull String rowNumber)
+            throws InvalidInputException, DataBaseCorruptException {
+        int rowNumberInt = Integer.parseInt(rowNumber);
+        if (!isTableExist(tableName)) {
+            String errorMessage = String.format("%s is not exist.", tableName);
+            throw new InvalidInputException(errorMessage);
+        }
+        if (!isTableValid(tableName)) {
+            String errorMessage = String.format("%s table is corrupted.", tableName);
+            throw new DataBaseCorruptException(errorMessage);
+        } else if (rowNumberInt < 1 || rowNumberInt >= Data.TABLES.get(tableName).size()) {
+            String errorMessage = String.format("Row number couldn't be %d", rowNumberInt);
+            throw new InvalidInputException(errorMessage);
+        } else {
+            StringBuilder text = new StringBuilder();
+            appendHeavyLine(text, tableName, true);
+            appendRowToText(text, tableName, 0, true);
+            appendLine(text, tableName, true);
+            appendRowToText(text, tableName, rowNumberInt, true);
+            appendHeavyLine(text, tableName, true);
+            text.deleteCharAt(text.length() - 1);
+
+            return text.toString();
+        }
+    }
+
+    /**
+     * Updates a specific cell in the given table.
+     *
+     * @param tableName  The name of the table where the cell is located.
+     * @param rowNumber  The number of the row to update (1-based index).
+     * @param columnName The name of the column to update.
+     * @param newValue   The new value to set in the specified cell.
+     * @throws InvalidInputException    If the table does not exist, the row number or column name is invalid.
+     * @throws DataBaseCorruptException If the structure of the table is corrupted.
+     */
+
+    public void updateCell(@NonNull String tableName,
+                           @NonNull String rowNumber,
+                           @NonNull String columnName,
+                           @NonNull String newValue)
+            throws InvalidInputException, DataBaseCorruptException {
+        Predicate<String> isValueValid = (inputValue) ->
+                !inputValue.startsWith(" ") &&
+                        !inputValue.endsWith(" ") &&
+                        !inputValue.contains("  ");
+        if (!isTableExist(tableName)) {
+            String errorMessage = String.format("%s table is not exist", tableName);
+            throw new InvalidInputException(errorMessage);
+        } else if (!isTableValid(tableName)) {
+            String errorMessage = String.format("%s table is corrupted.", tableName);
+            throw new DataBaseCorruptException(errorMessage);
+        } else if (
+                Integer.parseInt(rowNumber) < 1 ||
+                        Integer.parseInt(rowNumber) >= Data.TABLES.get(tableName).size()
+        ) {
+            String errorMessage = "Row does not exist.";
+            throw new InvalidInputException(errorMessage);
+        } else if (!Data.TABLES.get(tableName).getFirst().contains(columnName)) {
+            String errorMessage = String.format(
+                    "%s column does not exist in %s.",
+                    columnName,
+                    tableName
+            );
+            throw new InvalidInputException(errorMessage);
+        } else if (!isValueValid.test(newValue)) {
+            String errorMessage = "Invalid input: The value does not meet the required format.";
+            throw new InvalidInputException(errorMessage);
+        } else {
+            Data.TABLES.get(tableName)
+                    .get(Integer.parseInt(rowNumber))
+                    .set(
+                            Data.TABLES.get(tableName).getFirst().indexOf(columnName)
+                            , newValue
+                    );
+        }
+    }
+
+    public void deleteRow(@NonNull String tableName,
+                          @NonNull String rowNumber)
+            throws InvalidInputException, DataBaseCorruptException {
+        if (!isTableExist(tableName)) {
+            String errorMessage = String.format("%s table is not exist", tableName);
+            throw new InvalidInputException(errorMessage);
+        } else if (!isTableValid(tableName)) {
+            String errorMessage = String.format("%s table is corrupted.", tableName);
+            throw new DataBaseCorruptException(errorMessage);
+        } else if (
+                Integer.parseInt(rowNumber) < 1 ||
+                        Integer.parseInt(rowNumber) >= Data.TABLES.get(tableName).size()
+        ) {
+            String errorMessage = String.format(
+                    "Row %s does not exist in %s table.",
+                    rowNumber,
+                    tableName);
+            throw new InvalidInputException(errorMessage);
+        } else {
+            Data.TABLES.get(tableName).remove(Integer.parseInt(rowNumber));
+        }
+    }
+
+    /**
+     * Adds a new column to the specified table.
+     *
+     * @param tableName     the name of the table where the column will be added.
+     * @param newColumnName the name of the new column to add.
+     * @throws InvalidInputException    if the table does not exist, the column already exists,
+     *                                  or the column name is not valid.
+     * @throws DataBaseCorruptException if the table is corrupted.
+     */
+
+    public void addNewColumn(@NonNull String tableName,
+                             @NonNull String newColumnName)
+            throws InvalidInputException, DataBaseCorruptException {
+        Predicate<String> isValueValid = (inputValue) ->
+                !inputValue.isBlank() &&
+                        !inputValue.startsWith(" ") &&
+                        !inputValue.endsWith(" ") &&
+                        !inputValue.contains("  ");
+        if (!isTableExist(tableName)) {
+            String errorMessage = String.format("%s table is not exist", tableName);
+            throw new InvalidInputException(errorMessage);
+        } else if (!isTableValid(tableName)) {
+            String errorMessage = String.format("%s table is corrupted.", tableName);
+            throw new DataBaseCorruptException(errorMessage);
+        } else if (Data.TABLES.get(tableName).getFirst().contains(newColumnName)) {
+            String errorMessage = String.format(
+                    "%s column of %s table already exists.",
+                    newColumnName,
+                    tableName);
+            throw new InvalidInputException(errorMessage);
+        } else if (!isValueValid.test(newColumnName)) {
+            String errorMessage = "Invalid input: The value does not meet the required format.";
+            throw new InvalidInputException(errorMessage);
+        } else {
+            Data.TABLES.get(tableName).getFirst().add(newColumnName);
+            Data
+                    .TABLES
+                    .get(tableName)
+                    .stream()
+                    .skip(1)
+                    .forEach(row -> row.add(""));
+        }
+    }
+
+    /**
+     * Deletes a column from the specified table.
+     *
+     * @param tableName  The name of the table from which the column will be removed.
+     * @param columnName The name of the column to be deleted.
+     * @throws InvalidInputException    if the table does not exist, if the column does not exist.
+     * @throws DataBaseCorruptException if the table is corrupted.
+     */
+    public void deleteColumn(@NonNull String tableName,
+                             @NonNull String columnName)
+            throws InvalidInputException, DataBaseCorruptException {
+        if (!isTableExist(tableName)) {
+            String errorMessage = String.format("%s table is not exist", tableName);
+            throw new InvalidInputException(errorMessage);
+        } else if (!isTableValid(tableName)) {
+            String errorMessage = String.format("%s table is corrupted.", tableName);
+            throw new DataBaseCorruptException(errorMessage);
+        } else if (!Data.TABLES.get(tableName).getFirst().contains(columnName)) {
+            String errorMessage = String.format(
+                    "%s column of %s table does not exist.",
+                    columnName,
+                    tableName);
+            throw new InvalidInputException(errorMessage);
+        } else {
+            int indexOfColumn = Data.TABLES.get(tableName).getFirst().indexOf(columnName);
+            Data
+                    .TABLES
+                    .get(tableName)
+                    .forEach(row -> row.remove(indexOfColumn));
+        }
+    }
+
     private void appendRowToText(@NonNull StringBuilder text,
                                  @NonNull String tableName,
                                  int number,
@@ -144,10 +338,12 @@ public class Service {
         List<String> row = Data.TABLES.get(tableName).get(number);
         List<Integer> lengths = getColumnLengths(tableName);
         boolean header = number == 0;
-        int lengthOfLastNumber = String.valueOf(Data.TABLES.get(tableName)).length() - 1;
+        int lengthOfLastNumber = String.valueOf(Data.TABLES.get(tableName).size() - 1).length();
         int lengthOfCurrentNumber = String.valueOf(number).length();
-        text.append(verticalRuler && !header ?
-                " ".repeat(lengthOfLastNumber - lengthOfCurrentNumber) + number + " -> "
+        text.append(verticalRuler ?
+                header ?
+                        " ".repeat(lengthOfLastNumber + 4) + "|" :
+                        " ".repeat(lengthOfLastNumber - lengthOfCurrentNumber) + number + " -> |"
                 : "|");
         IntStream
                 .range(0, lengths.size())
@@ -164,7 +360,7 @@ public class Service {
                             @NonNull String tableName,
                             boolean verticalRuler) {
         List<Integer> lengths = getColumnLengths(tableName);
-        int lengthOfLastNumber = String.valueOf(Data.TABLES.get(tableName)).length() - 1;
+        int lengthOfLastNumber = String.valueOf(Data.TABLES.get(tableName).size() - 1).length();
         if (verticalRuler) {
             text.append(" ".repeat(lengthOfLastNumber + 4));
         }
@@ -182,7 +378,7 @@ public class Service {
     private void appendHeavyLine(@NonNull StringBuilder text,
                                  @NonNull String tableName,
                                  boolean verticalRuler) {
-        int lengthOfLastNumber = String.valueOf(Data.TABLES.get(tableName)).length() - 1;
+        int lengthOfLastNumber = String.valueOf(Data.TABLES.get(tableName).size() - 1).length();
         if (verticalRuler) {
             text.append(" ".repeat(lengthOfLastNumber + 4));
         }
