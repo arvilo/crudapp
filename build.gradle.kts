@@ -25,6 +25,6 @@ tasks.test {
 
 tasks.jar {
     manifest {
-        attributes["Main-Class"] = "az.arvilo.crudapp.ConsoleApp"
+        attributes["Main-Class"] = "az.arvilo.crudapp.Main"
     }
 }
