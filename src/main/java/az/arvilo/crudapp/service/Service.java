@@ -139,7 +139,7 @@ public class Service {
                     IntStream
                             .range(0, table.getFirst().size())
                             .mapToObj(i -> "")
-                            .toList()
+                            .collect(Collectors.toList())
             );
         }
     }
