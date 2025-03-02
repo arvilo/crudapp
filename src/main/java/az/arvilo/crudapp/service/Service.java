@@ -5,30 +5,21 @@ import az.arvilo.crudapp.exception.DataBaseCorruptException;
 import az.arvilo.crudapp.exception.InvalidInputException;
 import lombok.NonNull;
 
-import java.util.*;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Objects;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 public class Service {
 
-    /**
-     * Returns a list of all table names stored in memory.
-     */
     public List<String> getTableNames() {
 
         return new ArrayList<>(Data.TABLES.keySet());
     }
 
-    /**
-     * Creates a new table with the given name.
-     * - The table name must not be null, empty, contain leading/trailing spaces,
-     * or have consecutive spaces within the name.
-     * - It must not already exist in the database.
-     *
-     * @param newTableName The name of the table to be created.
-     * @throws InvalidInputException if the table name is invalid or already exists.
-     */
     public void createTable(@NonNull String newTableName) throws InvalidInputException {
         if (isTableExist(newTableName)) {
             String errorMessage = String.format("%s already exist.", newTableName);
@@ -41,13 +32,6 @@ public class Service {
         }
     }
 
-    /**
-     * Removes the specified table from the database.
-     * - The table name must not be null and must exist in the database.
-     *
-     * @param tableName The name of the table to be removed.
-     * @throws InvalidInputException if the table name does not exist in the database.
-     */
     public void dropTable(@NonNull String tableName)
             throws InvalidInputException {
         if (!isTableExist(tableName)) {
@@ -58,28 +42,13 @@ public class Service {
         }
     }
 
-    /**
-     * This method retrieves the table data and formats it into a human-readable
-     * string representation.
-     * - The table is displayed with a structured format, where columns and rows
-     * are separated by appropriate borders.
-     * - If `verticalRuler` is `true`, row numbers are displayed at the beginning
-     * of each row.
-     * - If the table is empty, it returns "Empty table."
-     *
-     * @param tableName     The name of the table to be rendered.
-     * @param verticalRuler Whether to display row indices and an additional separator.
-     * @return A formatted string representation of the table.
-     * @throws InvalidInputException    if the table does not exist.
-     * @throws DataBaseCorruptException if the table is corrupted.
-     */
     public String renderTable(@NonNull String tableName, boolean verticalRuler)
             throws InvalidInputException, DataBaseCorruptException {
         if (!isTableExist(tableName)) {
             String errorMessage = String.format("%s is not exist.", tableName);
             throw new InvalidInputException(errorMessage);
         }
-        if (!isTableValid(tableName)) {
+        if (isTableInvalid(tableName)) {
             String errorMessage = String.format("%s table is corrupted.", tableName);
             throw new DataBaseCorruptException(errorMessage);
         } else {
@@ -114,20 +83,13 @@ public class Service {
         }
     }
 
-    /**
-     * Adds a new row to the specified table in the database.
-     *
-     * @param tableName The name of the table to which a new row will be added.
-     * @throws InvalidInputException    if the table does not exist, is corrupted, or has no columns.
-     * @throws DataBaseCorruptException if the table is corrupted.
-     */
     public void addNewRow(@NonNull String tableName)
             throws InvalidInputException, DataBaseCorruptException {
         if (!isTableExist(tableName)) {
             String errorMessage = String.format("%s is not exist.", tableName);
             throw new InvalidInputException(errorMessage);
         }
-        if (!isTableValid(tableName)) {
+        if (isTableInvalid(tableName)) {
             String errorMessage = String.format("%s table is corrupted.", tableName);
             throw new DataBaseCorruptException(errorMessage);
         } else if (Data.TABLES.get(tableName).getFirst().isEmpty()) {
@@ -144,16 +106,6 @@ public class Service {
         }
     }
 
-    /**
-     * Renders a specific row from the specified table in a human-readable format.
-     * - The first row (index 0) is always the header.
-     *
-     * @param tableName The name of the table from which the row will be rendered.
-     * @param rowNumber The row index (starting from 1) to be displayed.
-     * @return A formatted string representation of the requested row.
-     * @throws InvalidInputException    if the table does not exist or the row number is invalid.
-     * @throws DataBaseCorruptException if the table is corrupted.
-     */
     public String renderRow(@NonNull String tableName, @NonNull String rowNumber)
             throws InvalidInputException, DataBaseCorruptException {
         int rowNumberInt = Integer.parseInt(rowNumber);
@@ -161,7 +113,7 @@ public class Service {
             String errorMessage = String.format("%s is not exist.", tableName);
             throw new InvalidInputException(errorMessage);
         }
-        if (!isTableValid(tableName)) {
+        if (isTableInvalid(tableName)) {
             String errorMessage = String.format("%s table is corrupted.", tableName);
             throw new DataBaseCorruptException(errorMessage);
         } else if (rowNumberInt < 1 || rowNumberInt >= Data.TABLES.get(tableName).size()) {
@@ -180,17 +132,6 @@ public class Service {
         }
     }
 
-    /**
-     * Updates a specific cell in the given table.
-     *
-     * @param tableName  The name of the table where the cell is located.
-     * @param rowNumber  The number of the row to update (1-based index).
-     * @param columnName The name of the column to update.
-     * @param newValue   The new value to set in the specified cell.
-     * @throws InvalidInputException    If the table does not exist, the row number or column name is invalid.
-     * @throws DataBaseCorruptException If the structure of the table is corrupted.
-     */
-
     public void updateCell(@NonNull String tableName,
                            @NonNull String rowNumber,
                            @NonNull String columnName,
@@ -203,7 +144,7 @@ public class Service {
         if (!isTableExist(tableName)) {
             String errorMessage = String.format("%s table is not exist", tableName);
             throw new InvalidInputException(errorMessage);
-        } else if (!isTableValid(tableName)) {
+        } else if (isTableInvalid(tableName)) {
             String errorMessage = String.format("%s table is corrupted.", tableName);
             throw new DataBaseCorruptException(errorMessage);
         } else if (
@@ -238,7 +179,7 @@ public class Service {
         if (!isTableExist(tableName)) {
             String errorMessage = String.format("%s table is not exist", tableName);
             throw new InvalidInputException(errorMessage);
-        } else if (!isTableValid(tableName)) {
+        } else if (isTableInvalid(tableName)) {
             String errorMessage = String.format("%s table is corrupted.", tableName);
             throw new DataBaseCorruptException(errorMessage);
         } else if (
@@ -255,16 +196,6 @@ public class Service {
         }
     }
 
-    /**
-     * Adds a new column to the specified table.
-     *
-     * @param tableName     the name of the table where the column will be added.
-     * @param newColumnName the name of the new column to add.
-     * @throws InvalidInputException    if the table does not exist, the column already exists,
-     *                                  or the column name is not valid.
-     * @throws DataBaseCorruptException if the table is corrupted.
-     */
-
     public void addNewColumn(@NonNull String tableName,
                              @NonNull String newColumnName)
             throws InvalidInputException, DataBaseCorruptException {
@@ -276,7 +207,7 @@ public class Service {
         if (!isTableExist(tableName)) {
             String errorMessage = String.format("%s table is not exist", tableName);
             throw new InvalidInputException(errorMessage);
-        } else if (!isTableValid(tableName)) {
+        } else if (isTableInvalid(tableName)) {
             String errorMessage = String.format("%s table is corrupted.", tableName);
             throw new DataBaseCorruptException(errorMessage);
         } else if (Data.TABLES.get(tableName).getFirst().contains(newColumnName)) {
@@ -299,21 +230,13 @@ public class Service {
         }
     }
 
-    /**
-     * Deletes a column from the specified table.
-     *
-     * @param tableName  The name of the table from which the column will be removed.
-     * @param columnName The name of the column to be deleted.
-     * @throws InvalidInputException    if the table does not exist, if the column does not exist.
-     * @throws DataBaseCorruptException if the table is corrupted.
-     */
     public void deleteColumn(@NonNull String tableName,
                              @NonNull String columnName)
             throws InvalidInputException, DataBaseCorruptException {
         if (!isTableExist(tableName)) {
             String errorMessage = String.format("%s table is not exist", tableName);
             throw new InvalidInputException(errorMessage);
-        } else if (!isTableValid(tableName)) {
+        } else if (isTableInvalid(tableName)) {
             String errorMessage = String.format("%s table is corrupted.", tableName);
             throw new DataBaseCorruptException(errorMessage);
         } else if (!Data.TABLES.get(tableName).getFirst().contains(columnName)) {
@@ -329,6 +252,25 @@ public class Service {
                     .get(tableName)
                     .forEach(row -> row.remove(indexOfColumn));
         }
+    }
+
+    public boolean doesColumnOfTableExist(@NonNull String columnName,
+                                          @NonNull String tableName) {
+
+        return Data.TABLES.containsKey(tableName) &&
+                Data.TABLES.get(tableName).getFirst().contains(columnName);
+    }
+
+    public boolean isTableEmpty(@NonNull String tableName) {
+
+        return !Data.TABLES.containsKey(tableName) ||
+                Data.TABLES.get(tableName).getFirst().isEmpty();
+    }
+
+    public boolean hasNoRows(@NonNull String tableName) {
+
+        return !Data.TABLES.containsKey(tableName) ||
+                Data.TABLES.get(tableName).size() <= 1;
     }
 
     private void appendRowToText(@NonNull StringBuilder text,
@@ -436,17 +378,17 @@ public class Service {
                 .collect(Collectors.toList());
     }
 
-    private boolean isTableValid(@NonNull String tableName) {
+    private boolean isTableInvalid(@NonNull String tableName) {
         List<List<String>> table = Data.TABLES.get(tableName);
 
         if (table.isEmpty()) {
 
-            return false;
+            return true;
         }
 
         if (table.stream().anyMatch(Objects::isNull)) {
 
-            return false;
+            return true;
         }
 
         if (
@@ -456,19 +398,19 @@ public class Service {
                                 row.stream().anyMatch(Objects::isNull))
         ) {
 
-            return false;
+            return true;
         }
 
         if (table.getFirst().isEmpty() && table.size() > 1) {
 
-            return false;
+            return true;
         }
 
         return table
                 .stream()
                 .skip(1)
-                .allMatch(row ->
-                        row.size() == table.getFirst().size());
+                .anyMatch(row ->
+                        row.size() != table.getFirst().size());
     }
 
     private boolean isValidTableName(String tableName) {

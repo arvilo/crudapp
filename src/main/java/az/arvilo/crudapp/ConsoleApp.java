@@ -12,8 +12,8 @@ import java.util.stream.IntStream;
 
 public class ConsoleApp implements AutoCloseable {
 
-    private Service service;
-    private Scanner scanner;
+    private final Service service;
+    private final Scanner scanner;
 
     public ConsoleApp(Service service) {
         scanner = new Scanner(System.in);
@@ -109,7 +109,7 @@ public class ConsoleApp implements AutoCloseable {
         message.append("Enter your choice: ");
         String input = getInput(message.toString());
         input = input.trim();
-        int index = -1;
+        int index;
         try {
             index = Integer.parseInt(input);
         } catch (NumberFormatException e) {
@@ -215,6 +215,7 @@ public class ConsoleApp implements AutoCloseable {
         clearConsole();
         StringBuilder message = new StringBuilder();
         try {
+            message.append(String.format("Table: %s\n", tableName));
             message.append(service.renderTable(tableName, false));
         } catch (InvalidInputException e) {
             throw new RuntimeException(e);
@@ -277,9 +278,18 @@ public class ConsoleApp implements AutoCloseable {
     }
 
     public void updateCellMenu(@NonNull String tableName) {
+        if (service.hasNoRows(tableName)) {
+            showAlert(
+                    3,
+                    "Doesn't exist any cell."
+            );
+            tableMenu(tableName);
+            return;
+        }
         clearConsole();
         StringBuilder message = new StringBuilder();
         try {
+            message.append(String.format("Table: %s\n", tableName));
             message.append(service.renderTable(tableName, true));
         } catch (InvalidInputException e) {
             throw new RuntimeException(e);
@@ -299,6 +309,7 @@ public class ConsoleApp implements AutoCloseable {
             return;
         }
         try {
+            message.append(String.format("Table: %s\n", tableName));
             message = new StringBuilder(service.renderRow(tableName, rowNumber));
         } catch (DataBaseCorruptException e) {
             showAlert(
@@ -306,7 +317,7 @@ public class ConsoleApp implements AutoCloseable {
                     "The database is corrupted. Please fix it and restart the app."
             );
             return;
-        } catch (InvalidInputException e) {
+        } catch (InvalidInputException | NumberFormatException e) {
             showInvalidInputAlert(3);
             updateCellMenu(tableName);
         }
@@ -315,6 +326,14 @@ public class ConsoleApp implements AutoCloseable {
         String columnName = getInput(message.toString());
         columnName = columnName.trim();
         columnName = columnName.replaceAll("\\s+", " ");
+        if (!service.doesColumnOfTableExist(columnName, tableName)) {
+            showAlert(
+                    3,
+                    String.format("%s column doesn't exist.", columnName)
+            );
+            updateCellMenu(tableName);
+            return;
+        }
         clearConsole();
         String newValue = getInput(
                 String.format(
@@ -363,8 +382,17 @@ public class ConsoleApp implements AutoCloseable {
     }
 
     public void deleteRowMenu(@NonNull String tableName) {
+        if (service.hasNoRows(tableName)) {
+            showAlert(
+                    3,
+                    "Doesn't exist any row."
+            );
+            tableMenu(tableName);
+            return;
+        }
         StringBuilder message = new StringBuilder();
         try {
+            message.append(String.format("Table: %s\n", tableName));
             message.append(service.renderTable(tableName, true));
         } catch (InvalidInputException e) {
             throw new RuntimeException(e);
@@ -385,7 +413,7 @@ public class ConsoleApp implements AutoCloseable {
         }
         try {
             service.deleteRow(tableName, rowNumber);
-        } catch (InvalidInputException e) {
+        } catch (InvalidInputException | NumberFormatException e) {
             showInvalidInputAlert(3);
             deleteRowMenu(tableName);
         } catch (DataBaseCorruptException e) {
@@ -399,6 +427,7 @@ public class ConsoleApp implements AutoCloseable {
     public void addNewColumnMenu(@NonNull String tableName) {
         StringBuilder message = new StringBuilder();
         try {
+            message.append(String.format("Table: %s\n", tableName));
             message.append(service.renderTable(tableName, false));
         } catch (DataBaseCorruptException e) {
             showAlert(
@@ -415,10 +444,19 @@ public class ConsoleApp implements AutoCloseable {
         if (input.isEmpty()) {
             showAlert(
                     4, """
-                            Input can't be empty string.
+                            Column name can't be empty string.
                             Please enter another name."""
             );
             addNewColumnMenu(tableName);
+            return;
+        }
+        if (service.doesColumnOfTableExist(input, tableName)) {
+            showAlert(
+                    3,
+                    String.format("%s column exists.", input)
+            );
+            tableMenu(tableName);
+            return;
         }
         clearConsole();
         String confirm = getInput(
@@ -439,6 +477,11 @@ public class ConsoleApp implements AutoCloseable {
                 tableMenu(tableName);
                 return;
         }
+        if (service.doesColumnOfTableExist(input, tableName)) {
+            showAlert(3,
+                    String.format("%s column is already exist.", input)
+            );
+        }
         try {
             service.addNewColumn(tableName, input);
             tableMenu(tableName);
@@ -453,8 +496,17 @@ public class ConsoleApp implements AutoCloseable {
     }
 
     public void deleteColumnMenu(@NonNull String tableName) {
+        if (service.isTableEmpty(tableName)) {
+            showAlert(
+                    3,
+                    "Doesn't exist any column."
+            );
+            tableMenu(tableName);
+            return;
+        }
         StringBuilder message = new StringBuilder();
         try {
+            message.append(String.format("Table: %s\n", tableName));
             message.append(service.renderTable(tableName, false));
         } catch (DataBaseCorruptException e) {
             showAlert(
@@ -468,6 +520,12 @@ public class ConsoleApp implements AutoCloseable {
         String input = getInput(message.toString());
         input = input.trim();
         input = input.replaceAll("\\s+", " ");
+        if (!service.doesColumnOfTableExist(input, tableName)) {
+            showAlert(3,
+                    String.format("%s column doesn't exist.", input)
+            );
+            tableMenu(tableName);
+        }
         clearConsole();
         String confirm = getInput(
                 String.format("""
@@ -493,7 +551,7 @@ public class ConsoleApp implements AutoCloseable {
         } catch (InvalidInputException e) {
             showAlert(
                     3,
-                    "%s column doesn't exist."
+                    String.format("%s column doesn't exist.", input)
             );
             deleteColumnMenu(tableName);
         } catch (DataBaseCorruptException e) {
